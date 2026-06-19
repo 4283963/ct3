@@ -47,6 +47,8 @@ export interface FormField {
   options?: Array<{ label: string; value: string | number | boolean }>
   defaultValue?: unknown
   props?: Record<string, unknown>
+  dependsOn?: string
+  optionsMap?: Record<string, Array<{ label: string; value: string | number | boolean }>>
 }
 
 export interface FormSchema {

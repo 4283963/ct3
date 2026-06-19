@@ -1,9 +1,9 @@
 <template>
   <el-form-item :label="field.label" :prop="field.key">
     <el-radio-group
-      v-model="localValue"
+      :model-value="modelValue"
       :disabled="field.disabled"
-      @change="emit('update:modelValue', localValue)"
+      @update:model-value="handleChange"
     >
       <el-radio
         v-for="opt in field.options || []"
@@ -18,7 +18,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
 import type { FormField } from '@/types'
 
 const props = defineProps<{
@@ -30,9 +29,9 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: unknown): void
 }>()
 
-const localValue = ref<unknown>(props.modelValue)
-
-watch(() => props.modelValue, (v) => {
-  localValue.value = v
-})
+function handleChange(val: unknown) {
+  if (val !== props.modelValue) {
+    emit('update:modelValue', val)
+  }
+}
 </script>

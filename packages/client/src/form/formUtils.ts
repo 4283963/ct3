@@ -6,22 +6,35 @@ export function buildDefaultValues(fields: FormField[]): Record<string, unknown>
     if (field.defaultValue !== undefined) {
       values[field.key] = field.defaultValue
     } else {
-      switch (field.type) {
-        case 'checkbox':
-          values[field.key] = []
-          break
-        case 'switch':
-          values[field.key] = false
-          break
-        case 'number':
-          values[field.key] = undefined
-          break
-        default:
-          values[field.key] = ''
-      }
+      values[field.key] = getDefaultForType(field.type)
     }
   })
   return values
+}
+
+export function getDefaultForType(type: FormField['type']): unknown {
+  switch (type) {
+    case 'checkbox':
+      return []
+    case 'switch':
+      return false
+    case 'number':
+      return undefined
+    default:
+      return ''
+  }
+}
+
+export function resolveFieldOptions(
+  field: FormField,
+  depValue: unknown,
+  dynamicOverride?: Array<{ label: string; value: string | number | boolean }>
+): Array<{ label: string; value: string | number | boolean }> {
+  if (dynamicOverride) return dynamicOverride
+  if (field.dependsOn && field.optionsMap) {
+    return field.optionsMap[String(depValue)] || []
+  }
+  return field.options || []
 }
 
 export function buildFieldRules(field: FormField) {

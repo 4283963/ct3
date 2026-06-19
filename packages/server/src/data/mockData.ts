@@ -208,5 +208,54 @@ export const mockFormSchemas: FormSchema[] = [
     ],
     createdAt: now,
     updatedAt: now
+  },
+  {
+    id: 'form_cascade',
+    name: '省市级联示例表单',
+    description: '演示下拉框联动（选省份后城市跟随变化）',
+    roles: ['super_admin', 'department_manager', 'employee'],
+    layout: { columns: 2, labelWidth: 120 },
+    submitUrl: '/api/form/submit/cascade',
+    fields: [
+      {
+        key: 'province',
+        type: 'select',
+        label: '省份',
+        required: true,
+        options: [
+          { label: '广东省', value: 'gd' },
+          { label: '浙江省', value: 'zj' },
+          { label: '江苏省', value: 'js' }
+        ],
+        defaultValue: 'gd'
+      },
+      {
+        key: 'city',
+        type: 'select',
+        label: '城市',
+        required: true,
+        dependsOn: 'province',
+        optionsMap: {
+          gd: [
+            { label: '广州市', value: 'gz' },
+            { label: '深圳市', value: 'sz' },
+            { label: '珠海市', value: 'zh' }
+          ],
+          zj: [
+            { label: '杭州市', value: 'hz' },
+            { label: '宁波市', value: 'nb' },
+            { label: '温州市', value: 'wz' }
+          ],
+          js: [
+            { label: '南京市', value: 'nj' },
+            { label: '苏州市', value: 'su' },
+            { label: '无锡市', value: 'wx' }
+          ]
+        }
+      },
+      { key: 'address', type: 'input', label: '详细地址', placeholder: '请输入详细地址', defaultValue: '' }
+    ],
+    createdAt: now,
+    updatedAt: now
   }
 ]

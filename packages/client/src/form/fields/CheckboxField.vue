@@ -1,9 +1,9 @@
 <template>
   <el-form-item :label="field.label" :prop="field.key">
     <el-checkbox-group
-      v-model="localValue"
+      :model-value="Array.isArray(modelValue) ? [...(modelValue as unknown[])] : []"
       :disabled="field.disabled"
-      @change="emit('update:modelValue', localValue)"
+      @update:model-value="handleChange"
     >
       <el-checkbox
         v-for="opt in field.options || []"
@@ -18,7 +18,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
 import type { FormField } from '@/types'
 
 const props = defineProps<{
@@ -30,9 +29,11 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: unknown): void
 }>()
 
-const localValue = ref<unknown[]>(Array.isArray(props.modelValue) ? [...props.modelValue] : [])
-
-watch(() => props.modelValue, (v) => {
-  localValue.value = Array.isArray(v) ? [...v] : []
-}, { deep: true })
+function handleChange(val: unknown) {
+  const newArr = Array.isArray(val) ? [...val] : []
+  const oldArr = Array.isArray(props.modelValue) ? [...(props.modelValue as unknown[])] : []
+  if (newArr.length !== oldArr.length || newArr.some((v, i) => v !== oldArr[i])) {
+    emit('update:modelValue', newArr)
+  }
+}
 </script>

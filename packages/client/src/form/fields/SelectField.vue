@@ -1,12 +1,12 @@
 <template>
   <el-form-item :label="field.label" :prop="field.key">
     <el-select
-      v-model="localValue"
+      :model-value="modelValue"
       :placeholder="field.placeholder || `请选择${field.label}`"
       :disabled="field.disabled"
       style="width: 100%"
       v-bind="field.props || {}"
-      @change="emit('update:modelValue', localValue)"
+      @update:model-value="handleChange"
     >
       <el-option
         v-for="opt in field.options || []"
@@ -19,7 +19,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
 import type { FormField } from '@/types'
 
 const props = defineProps<{
@@ -31,9 +30,9 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: unknown): void
 }>()
 
-const localValue = ref<unknown>(props.modelValue ?? '')
-
-watch(() => props.modelValue, (v) => {
-  localValue.value = v ?? ''
-})
+function handleChange(val: unknown) {
+  if (val !== props.modelValue) {
+    emit('update:modelValue', val)
+  }
+}
 </script>

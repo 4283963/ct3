@@ -1,16 +1,15 @@
 <template>
   <el-form-item :label="field.label" :prop="field.key">
     <el-switch
-      v-model="localValue"
+      :model-value="Boolean(modelValue)"
       :disabled="field.disabled"
       v-bind="field.props || {}"
-      @change="emit('update:modelValue', localValue)"
+      @update:model-value="handleChange"
     />
   </el-form-item>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
 import type { FormField } from '@/types'
 
 const props = defineProps<{
@@ -22,9 +21,10 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: unknown): void
 }>()
 
-const localValue = ref<boolean>(Boolean(props.modelValue))
-
-watch(() => props.modelValue, (v) => {
-  localValue.value = Boolean(v)
-})
+function handleChange(val: unknown) {
+  const v = Boolean(val)
+  if (v !== Boolean(props.modelValue)) {
+    emit('update:modelValue', v)
+  }
+}
 </script>

@@ -90,7 +90,22 @@
                 <el-switch v-model="selectedField.disabled" />
               </el-form-item>
               <template v-if="hasOptions(selectedField.type)">
-                <el-form-item label="选项列表">
+                <el-form-item label="联动依赖">
+                  <el-select
+                    v-model="selectedField.dependsOn"
+                    clearable
+                    placeholder="无联动"
+                    style="width: 100%;"
+                  >
+                    <el-option
+                      v-for="f in otherSelectFields"
+                      :key="f.key"
+                      :label="f.label"
+                      :value="f.key"
+                    />
+                  </el-select>
+                </el-form-item>
+                <el-form-item v-if="!selectedField.dependsOn" label="选项列表">
                   <div style="width: 100%">
                     <div
                       v-for="(opt, oIdx) in selectedField.options"
@@ -102,6 +117,29 @@
                       <el-button link type="danger" size="small" @click="removeOption(oIdx)">移除</el-button>
                     </div>
                     <el-button size="small" @click="addOption">+ 添加选项</el-button>
+                  </div>
+                </el-form-item>
+                <el-form-item v-else label="联动配置">
+                  <div style="width: 100%">
+                    <div
+                      v-for="depOpt in dependencyValues"
+                      :key="String(depOpt.value)"
+                      style="margin-bottom: 12px; padding: 8px; border: 1px solid #ebeef5; border-radius: 4px;"
+                    >
+                      <div style="font-size: 12px; color: #606266; margin-bottom: 6px;">
+                        当 [{{ depOpt.label }}] 选中时：
+                      </div>
+                      <div
+                        v-for="(opt, oIdx) in getMapOptions(depOpt.value)"
+                        :key="oIdx"
+                        style="display: flex; gap: 8px; margin-bottom: 4px;"
+                      >
+                        <el-input v-model="opt.label" placeholder="显示名" size="small" style="flex: 1;" />
+                        <el-input v-model="opt.value" placeholder="值" size="small" style="flex: 1;" />
+                        <el-button link type="danger" size="small" @click="removeMapOption(depOpt.value, oIdx)">移除</el-button>
+                      </div>
+                      <el-button size="small" @click="addMapOption(depOpt.value)">+ 添加选项</el-button>
+                    </div>
                   </div>
                 </el-form-item>
               </template>
@@ -259,6 +297,39 @@ function addOption() {
 function removeOption(idx: number) {
   if (!selectedField.value?.options) return
   selectedField.value.options.splice(idx, 1)
+}
+
+const otherSelectFields = computed(() =>
+  fields.value.filter((f) => f.key !== selectedField.value?.key && hasOptions(f.type))
+)
+
+const dependencyValues = computed(() => {
+  if (!selectedField.value?.dependsOn) return []
+  const dep = fields.value.find((f) => f.key === selectedField.value!.dependsOn)
+  return dep?.options || []
+})
+
+function getMapOptions(depValue: string | number | boolean) {
+  if (!selectedField.value) return []
+  if (!selectedField.value.optionsMap) {
+    selectedField.value.optionsMap = {}
+  }
+  const key = String(depValue)
+  if (!selectedField.value.optionsMap[key]) {
+    selectedField.value.optionsMap[key] = []
+  }
+  return selectedField.value.optionsMap[key]
+}
+
+function addMapOption(depValue: string | number | boolean) {
+  const opts = getMapOptions(depValue)
+  const nextIdx = opts.length + 1
+  opts.push({ label: `选项${nextIdx}`, value: `opt${nextIdx}` })
+}
+
+function removeMapOption(depValue: string | number | boolean, idx: number) {
+  const opts = getMapOptions(depValue)
+  opts.splice(idx, 1)
 }
 
 async function saveSchema() {
