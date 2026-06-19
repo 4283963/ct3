@@ -158,18 +158,37 @@
     </el-row>
 
     <el-dialog v-model="previewVisible" title="表单预览" width="720px">
-      <DynamicForm v-if="previewVisible" :schema="previewSchema" />
+      <template #footer>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <div>
+            <el-button @click="handleImportPackage">
+              <el-icon><Upload /></el-icon>
+              导入配置
+            </el-button>
+            <el-button @click="handleExportPackage">
+              <el-icon><Download /></el-icon>
+              导出配置
+            </el-button>
+          </div>
+          <el-button @click="previewVisible = false">关闭</el-button>
+        </div>
+      </template>
+      <DynamicForm
+        v-if="previewVisible"
+        ref="previewFormRef"
+        :schema="renderPreviewSchema"
+        @import="handleFormImport"
+      />
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, watch } from 'vue'
 import { useFormStore } from '@/stores/form'
 import { ElMessage } from 'element-plus'
 import { availableFieldTypes } from '@/form/fieldResolver'
 import { DynamicForm } from '@/form'
-import type { FormField } from '@/types'
 import {
   Edit,
   EditPen,
@@ -180,10 +199,12 @@ import {
   Switch,
   Calendar,
   Upload,
+  Download,
   ArrowUp,
   ArrowDown,
   Delete
 } from '@element-plus/icons-vue'
+import type { FormField, FormSchema } from '@/types'
 
 const formStore = useFormStore()
 
@@ -192,6 +213,8 @@ const formName = ref('新表单')
 const fields = ref<FormField[]>([])
 const selectedIdx = ref(-1)
 const previewVisible = ref(false)
+const previewFormRef = ref<InstanceType<typeof DynamicForm>>()
+const importedSchema = ref<FormSchema | null>(null)
 
 const selectedField = computed(() => (selectedIdx.value >= 0 ? fields.value[selectedIdx.value] : null))
 
@@ -210,6 +233,14 @@ const previewSchema = computed(() => ({
   createdAt: Date.now(),
   updatedAt: Date.now()
 }))
+
+const renderPreviewSchema = computed(() => importedSchema.value || previewSchema.value)
+
+watch(previewVisible, (val) => {
+  if (!val) {
+    importedSchema.value = null
+  }
+})
 
 function getFieldIcon(type: string) {
   const iconMap: Record<string, unknown> = {
@@ -330,6 +361,27 @@ function addMapOption(depValue: string | number | boolean) {
 function removeMapOption(depValue: string | number | boolean, idx: number) {
   const opts = getMapOptions(depValue)
   opts.splice(idx, 1)
+}
+
+async function handleExportPackage() {
+  if (!previewFormRef.value) return
+  const fileName = importedSchema.value
+    ? `${importedSchema.value.name}-${Date.now()}.formpkg`
+    : `${formName.value}-${Date.now()}.formpkg`
+  await previewFormRef.value.exportPackage(fileName)
+  ElMessage.success('配置文件导出成功')
+}
+
+async function handleImportPackage() {
+  if (!previewFormRef.value) return
+  await previewFormRef.value.importPackage()
+}
+
+function handleFormImport(payload: { schema: FormSchema; data: Record<string, unknown> }) {
+  importedSchema.value = payload.schema
+  if (payload.schema.name) {
+    formName.value = payload.schema.name
+  }
 }
 
 async function saveSchema() {

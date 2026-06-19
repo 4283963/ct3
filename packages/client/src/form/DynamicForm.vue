@@ -28,13 +28,20 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, watch } from 'vue'
+import { reactive, ref, computed, watch, watchEffect } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { FormSchema, FormField } from '@/types'
 import { resolveFieldComponent } from './fieldResolver'
 import { buildDefaultValues, buildFieldRules, getDefaultForType } from './formUtils'
+import {
+  exportFormPackage,
+  downloadFormPackage,
+  importFormPackage,
+  triggerFileInput,
+  validateFormPackage
+} from './formPort'
 import { formApi } from '@/api/form'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 type FieldOption = { label: string; value: string | number | boolean }
 
@@ -46,10 +53,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'submit', values: Record<string, unknown>): void
   (e: 'change', values: Record<string, unknown>): void
+  (e: 'import', data: { schema: FormSchema; data: Record<string, unknown> }): void
 }>()
 
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
+const watchCleanupFns = ref<Array<() => void>>([])
 
 const formData = reactive<Record<string, unknown>>({})
 
@@ -60,27 +69,40 @@ function initFormData() {
   Object.assign(formData, defaults, props.initialValues || {})
 }
 
-initFormData()
+function setupCascadeWatches() {
+  watchCleanupFns.value.forEach((fn) => fn())
+  watchCleanupFns.value = []
 
-props.schema.fields.forEach((field: FormField) => {
-  if (!field.dependsOn || !field.optionsMap) return
+  props.schema.fields.forEach((field: FormField) => {
+    if (!field.dependsOn || !field.optionsMap) return
 
-  const depKey = field.dependsOn
-  const initDep = formData[depKey]
-  dynamicOptions[field.key] = field.optionsMap[String(initDep)] || []
+    const depKey = field.dependsOn
+    const initDep = formData[depKey]
+    dynamicOptions[field.key] = field.optionsMap[String(initDep)] || []
 
-  watch(
-    () => formData[depKey],
-    (newDep) => {
-      const newOptions = field.optionsMap![String(newDep)] || []
-      dynamicOptions[field.key] = newOptions
-      const currentVal = formData[field.key]
-      const inOptions = newOptions.some((o) => o.value === currentVal)
-      if (!inOptions) {
-        formData[field.key] = getDefaultForType(field.type)
+    const stop = watch(
+      () => formData[depKey],
+      (newDep) => {
+        const newOptions = field.optionsMap![String(newDep)] || []
+        dynamicOptions[field.key] = newOptions
+        const currentVal = formData[field.key]
+        const inOptions = newOptions.some((o) => o.value === currentVal)
+        if (!inOptions) {
+          formData[field.key] = getDefaultForType(field.type)
+        }
       }
-    }
-  )
+    )
+    watchCleanupFns.value.push(stop)
+  })
+}
+
+initFormData()
+setupCascadeWatches()
+
+watchEffect(() => {
+  props.schema.fields.forEach(() => {})
+  initFormData()
+  setupCascadeWatches()
 })
 
 const renderFields = computed<FormField[]>(() =>
@@ -115,6 +137,23 @@ async function handleSubmit() {
     }
     ElMessage.success('提交成功')
     emit('submit', { ...formData })
+
+    try {
+      const { value: confirmExport } = await ElMessageBox.confirm(
+        '是否下载包含当前表单配置和填写数据的配置文件？',
+        '导出配置',
+        {
+          confirmButtonText: '下载',
+          cancelButtonText: '取消',
+          type: 'success'
+        }
+      )
+      if (confirmExport) {
+        await exportCurrentPackage()
+      }
+    } catch {
+      // 用户取消导出
+    }
   } catch {
     ElMessage.warning('请检查表单填写')
   } finally {
@@ -134,4 +173,48 @@ async function handleReset() {
     })
   }
 }
+
+async function exportCurrentPackage(fileName?: string) {
+  const blob = await exportFormPackage(props.schema, { ...formData })
+  downloadFormPackage(blob, fileName)
+  return blob
+}
+
+async function importCurrentPackage(): Promise<{ schema: FormSchema; data: Record<string, unknown> } | null> {
+  try {
+    const file = await triggerFileInput()
+    const pkg = await importFormPackage(file)
+    if (!validateFormPackage(pkg)) {
+      throw new Error('配置文件格式验证失败')
+    }
+    Object.keys(formData).forEach((key) => delete formData[key])
+    Object.assign(formData, buildDefaultValues(pkg.schema.fields), pkg.data)
+    emit('import', { schema: pkg.schema, data: pkg.data })
+    ElMessage.success('配置导入成功，表单已复原')
+    return { schema: pkg.schema, data: pkg.data }
+  } catch (e) {
+    if (e instanceof Error && e.message !== '取消选择') {
+      ElMessage.error(`导入失败：${e instanceof Error ? e.message : '未知错误'}`)
+    }
+    return null
+  }
+}
+
+function setFormData(data: Record<string, unknown>) {
+  Object.keys(formData).forEach((key) => delete formData[key])
+  Object.assign(formData, data)
+}
+
+function getFormData(): Record<string, unknown> {
+  return { ...formData }
+}
+
+defineExpose({
+  exportPackage: exportCurrentPackage,
+  importPackage: importCurrentPackage,
+  setFormData,
+  getFormData,
+  submit: handleSubmit,
+  reset: handleReset
+})
 </script>

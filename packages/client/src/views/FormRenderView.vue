@@ -5,6 +5,10 @@
         <div class="card-header">
           <span>可用表单列表</span>
           <div>
+            <el-button @click="handleImportPackage" style="margin-right: 12px;">
+              <el-icon><Upload /></el-icon>
+              导入配置
+            </el-button>
             <el-input
               v-model="keyword"
               placeholder="搜索表单名称"
@@ -62,11 +66,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, type HistoryState } from 'vue-router'
 import { useFormStore } from '@/stores/form'
 import { useUserStore } from '@/stores/user'
-import { Search } from '@element-plus/icons-vue'
+import { Search, Upload } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { importFormPackage, triggerFileInput, validateFormPackage } from '@/form'
 
 const formStore = useFormStore()
 const userStore = useUserStore()
@@ -100,6 +105,25 @@ async function handleDelete(row: { id: string; name: string }) {
 onMounted(() => {
   formStore.fetchSchemas()
 })
+
+async function handleImportPackage() {
+  try {
+    const file = await triggerFileInput()
+    const pkg = await importFormPackage(file)
+    if (!validateFormPackage(pkg)) {
+      throw new Error('配置文件格式验证失败')
+    }
+    const state = { pkg }
+    router.push({
+      path: '/form-render/import',
+      state: state as unknown as HistoryState
+    })
+  } catch (e) {
+    if (e instanceof Error && e.message !== '取消选择') {
+      ElMessage.error(`导入失败：${e instanceof Error ? e.message : '未知错误'}`)
+    }
+  }
+}
 </script>
 
 <style scoped>
